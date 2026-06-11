@@ -1,0 +1,61 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from Accueil import load_data
+
+st.title("🌍 Cours des Marchés Mondiaux")
+st.markdown("Suivi des cours internationaux des produits de base et matières premières critiques exportées par la RDC.")
+st.markdown("---")
+
+try:
+    _, _, df_marches, _ = load_data()
+    
+    # Nettoyer la colonne Date/Mois si nécessaire
+    df_marches = df_marches.dropna(subset=['Mois'])
+    
+    # Proposer des filtres par commodités majeures
+    commodities_dict = {
+        'MM_CUIVRE_NOM': 'Cuivre (Nominal, $/mt)',
+        'MM_OR_NOM': 'Or (Nominal, $/mt)',
+        'MM_CAFÉ_ROBUSTA_NOM': 'Café Robusta (Nominal, $/kg)',
+        'MM_CACAO_NOM': 'Cacao (Nominal, $/mt)'
+    }
+    
+    col_c1, col_c2 = st.columns([1, 3])
+    
+    with col_c1:
+        st.markdown("### Matières Premières")
+        selected_cols = st.multiselect(
+            "Sélectionnez les produits :",
+            options=list(commodities_dict.keys()),
+            default=['MM_CUIVRE_NOM'],
+            format_func=lambda x: commodities_dict[x]
+        )
+        
+        horizon = st.radio("Horizon temporel :", ["Totalité des données", "Dernières années (Récents)"])
+        df_plot = df_marches if horizon == "Totalité des données" else df_marches.tail(120)
+
+    with col_c2:
+        if selected_cols:
+            # S'assurer du format numérique
+            for c in selected_cols:
+                df_plot[c] = pd.to_numeric(df_plot[c], errors='coerce')
+                
+            fig_marches = px.line(
+                df_plot,
+                x='Mois',
+                y=selected_cols,
+                title="Évolution des cours internationaux",
+                labels={'Mois': 'Date', 'value': 'Prix sur le marché mondial'}
+            )
+            
+            # Renommer proprement les légendes dans le graphique
+            for idx, col in enumerate(selected_cols):
+                fig_marches.data[idx].name = commodities_dict[col]
+                
+            st.plotly_chart(fig_marches, use_container_width=True)
+        else:
+            st.info("Sélectionnez un ou plusieurs produits à analyser.")
+
+except Exception as e:
+    st.error(f"Erreur d'affichage des marchés mondiaux : {e}")
