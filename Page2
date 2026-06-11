@@ -1,0 +1,60 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from Accueil import load_data  # Importation de la fonction de cache globale
+
+st.title("💱 Secteur Monétaire et Taux de Change")
+st.markdown("Analyse des dynamiques de change mensuelles (Marché indicatif vs Marché parallèle) et évolution des taux d'intérêt.")
+st.markdown("---")
+
+try:
+    _, df_tc, _, _ = load_data()
+    
+    # Préparation rapide des colonnes monétaires
+    df_tc['TC_INDIC_MOY'] = pd.to_numeric(df_tc['TC_INDIC_MOY'], errors='coerce')
+    df_tc['TC_PARAL_MOY'] = pd.to_numeric(df_tc['TC_PARAL_MOY'], errors='coerce')
+    
+    # Structuration de la page en deux colonnes
+    col_param, col_graph = st.columns([1, 3])
+    
+    with col_param:
+        st.markdown("### Configuration")
+        # Sélection des indicateurs
+        variables = st.multiselect(
+            "Indicateurs de change :",
+            options=['TC_INDIC_MOY', 'TC_PARAL_MOY'],
+            default=['TC_INDIC_MOY', 'TC_PARAL_MOY'],
+            format_func=lambda x: "Taux Indicatif (Moyen)" if x == 'TC_INDIC_MOY' else "Taux Parallèle (Moyen)"
+        )
+        
+        # Filtre sur les lignes
+        sample_size = st.slider("Échantillon de points à afficher :", 10, len(df_tc), 200)
+        df_sample = df_tc.tail(sample_size)
+        
+        # Option de téléchargement de la série brute filtrée
+        st.markdown("### Extraction")
+        csv = df_sample[['Mois'] + variables].to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Télécharger les données (.csv)",
+            data=csv,
+            file_name="taux_de_change_rdc.csv",
+            mime="text/csv"
+        )
+
+    with col_graph:
+        if variables:
+            fig_tc = px.line(
+                df_sample,
+                x='Mois',
+                y=variables,
+                title="Évolution du cours du Franc Congolais (CDF/USD)",
+                labels={'Mois': 'Période (Mensuelle)', 'value': 'Taux de change (CDF pour 1 USD)'},
+                color_discrete_sequence=["#0071BC", "#D9534F"]
+            )
+            fig_tc.update_layout(hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_tc, use_container_width=True)
+        else:
+            st.info("Veuillez sélectionner au moins un indicateur dans le panneau de gauche pour générer le graphique.")
+
+except Exception as e:
+    st.error(f"Impossible d'afficher les données de change : {e}")
